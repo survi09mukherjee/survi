@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 
 export default function Settings() {
   const navigate = useNavigate();
-  const [language, setLanguage] = useState<'en' | 'bn'>(DEMO_USER.language);
+  const [language, setLanguage] = useState<string>(DEMO_USER.language);
   const [voiceSpeed, setVoiceSpeed] = useState([1]);
   const [notifications, setNotifications] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
@@ -24,9 +24,7 @@ export default function Settings() {
   };
 
   const handleLanguageChange = (value: string) => {
-    if (value === 'en' || value === 'bn') {
-      setLanguage(value);
-    }
+    setLanguage(value);
   };
 
   return (

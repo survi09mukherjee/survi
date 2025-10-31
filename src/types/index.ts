@@ -1,13 +1,15 @@
 export interface User {
   id: string;
   name: string;
-  grade: number;
+  age?: number;
+  grade: string; // Changed to string to support toddler, nursery, etc.
   avatarId: string;
-  language: 'en' | 'bn';
+  language: string; // Support all Indian languages
   accuracy: number;
   streak: number;
   lessonsCompleted: number;
   badges: string[];
+  preferredLearningMode: 'video' | 'voice' | 'mixed';
 }
 
 export interface Avatar {

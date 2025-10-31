@@ -22,7 +22,7 @@ export default function Dashboard() {
             </div>
             <div>
               <h2 className="font-semibold">Hi, {currentUser.name}! 👋</h2>
-              <p className="text-sm text-muted-foreground">Grade {currentUser.grade}</p>
+              <p className="text-sm text-muted-foreground">Grade {currentUser.grade.replace('class-', '').toUpperCase()}</p>
             </div>
           </div>
           
@@ -92,16 +92,33 @@ export default function Dashboard() {
 
           <Card
             className="p-6 cursor-pointer hover:shadow-float transition-all duration-200 hover:scale-105"
-            onClick={() => navigate('/avatar-select')}
+            onClick={() => navigate('/character-generator')}
           >
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-full bg-secondary/20 flex items-center justify-center text-2xl">
-                {selectedAvatar?.image || '🤖'}
+                ✨
               </div>
               <div>
-                <h3 className="font-semibold mb-1">Change Avatar</h3>
+                <h3 className="font-semibold mb-1">Create Character</h3>
                 <p className="text-sm text-muted-foreground">
-                  Try a different tutor style
+                  Design your AI tutor avatar
+                </p>
+              </div>
+            </div>
+          </Card>
+
+          <Card
+            className="p-6 cursor-pointer hover:shadow-float transition-all duration-200 hover:scale-105"
+            onClick={() => navigate('/lesson-library')}
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                📚
+              </div>
+              <div>
+                <h3 className="font-semibold mb-1">Lesson Library</h3>
+                <p className="text-sm text-muted-foreground">
+                  Browse all lessons
                 </p>
               </div>
             </div>

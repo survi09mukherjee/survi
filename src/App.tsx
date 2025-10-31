@@ -11,6 +11,10 @@ import Lesson from "./pages/Lesson";
 import Chat from "./pages/Chat";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
+import CharacterGenerator from "./pages/CharacterGenerator";
+import VideoLesson from "./pages/VideoLesson";
+import LessonLibrary from "./pages/LessonLibrary";
+import LanguageHub from "./pages/LanguageHub";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +34,10 @@ const App = () => (
           <Route path="/chat" element={<Chat />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/character-generator" element={<CharacterGenerator />} />
+          <Route path="/video-lesson" element={<VideoLesson />} />
+          <Route path="/lesson-library" element={<LessonLibrary />} />
+          <Route path="/language-hub" element={<LanguageHub />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

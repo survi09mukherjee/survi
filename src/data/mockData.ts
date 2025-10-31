@@ -1,4 +1,5 @@
 import { Avatar, Lesson, User } from '@/types';
+import { Character } from '@/types/video';
 
 export const AVATARS: Avatar[] = [
   {
@@ -35,6 +36,45 @@ export const AVATARS: Avatar[] = [
   },
 ];
 
+export const CHARACTERS: Character[] = [
+  {
+    id: 'riya-raincloud',
+    name: 'Riya Raincloud',
+    type: 'cartoon',
+    tone: 'storyteller',
+    style: 'Friendly weather teacher with a cloud theme',
+    image: '☁️',
+    unlocked: true,
+  },
+  {
+    id: 'math-ninja',
+    name: 'Math Ninja',
+    type: 'anime',
+    tone: 'motivational',
+    style: 'Energetic number warrior who conquers math problems',
+    image: '⚡',
+    unlocked: true,
+  },
+  {
+    id: 'professor-curious',
+    name: 'Professor Curious',
+    type: 'realistic',
+    tone: 'calm',
+    style: 'Patient scientist who loves experiments',
+    image: '🔬',
+    unlocked: true,
+  },
+  {
+    id: 'story-wizard',
+    name: 'Story Wizard',
+    type: 'cartoon',
+    tone: 'funny',
+    style: 'Magical storyteller who teaches through tales',
+    image: '🧙‍♂️',
+    unlocked: false,
+  },
+];
+
 export const SAMPLE_LESSON: Lesson = {
   id: 'fractions-1',
   subject: 'Mathematics',
@@ -63,13 +103,15 @@ Great work! 🎉`,
 export const DEMO_USER: User = {
   id: 'demo-user',
   name: 'Alex',
-  grade: 6,
+  age: 11,
+  grade: 'class-6',
   avatarId: 'mentor',
   language: 'en',
   accuracy: 87,
   streak: 7,
   lessonsCompleted: 24,
   badges: ['first-lesson', 'week-streak', 'quiz-master'],
+  preferredLearningMode: 'mixed',
 };
 
 export const TUTOR_RESPONSES = {
