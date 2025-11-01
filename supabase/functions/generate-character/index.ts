@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { characterName, characterType, tone, style } = await req.json();
+    const { characterName, characterType, tone, style, pose } = await req.json();
     
     if (!characterName) {
       return new Response(
@@ -35,12 +35,45 @@ serve(async (req) => {
       styleDesc = "realistic, professional mentor style with photographic quality";
     }
 
-    const toneDesc = tone === "funny" ? "cheerful, playful expression" :
-                     tone === "calm" ? "gentle, peaceful expression" :
-                     tone === "motivational" ? "energetic, inspiring pose" :
-                     "wise, storytelling expression";
+    const toneDesc = tone === "funny" ? "cheerful, playful expression with a big smile" :
+                     tone === "calm" ? "gentle, peaceful expression with soft eyes" :
+                     tone === "motivational" ? "energetic, inspiring pose with confident stance" :
+                     "wise, storytelling expression with kind demeanor";
 
-    const prompt = `Create a 3D rendered avatar of ${characterName} character in ${styleDesc}. The character should have ${toneDesc}. 3D animation style, Pixar-quality rendering, highly detailed 3D model, animated character pose as a friendly teacher gesturing welcomingly. Professional 3D character design, child-friendly, no background, isolated character only. Ultra high resolution 3D render. Square format 1:1 aspect ratio.`;
+    const poseDesc = pose === "wave" ? "waving friendly gesture" :
+                     pose === "nod" ? "nodding approvingly" :
+                     pose === "point" ? "pointing gesture as if teaching" :
+                     pose === "thumbs-up" ? "giving thumbs up encouragingly" :
+                     "welcoming gesture";
+
+    // Keyword mapping for popular characters (for prototype/demo purposes)
+    const characterMapping: { [key: string]: string } = {
+      "doraemon": "blue robot cat with round body and red collar",
+      "chhota bheem": "young Indian boy with orange dhoti and brave expression",
+      "nobita": "young boy with glasses and casual clothing",
+      "shinchan": "mischievous young boy with playful expression",
+      "naruto": "blonde ninja with headband and orange outfit",
+      "goku": "spiky black hair martial artist with orange gi",
+      "harry potter": "young wizard with glasses and lightning scar",
+      "batman": "dark hero in bat costume with cape",
+      "thor": "blonde hero with hammer and armor",
+      "hulk": "large green muscular hero",
+      "gojo satoru": "silver-haired character with blindfold or sunglasses",
+      "luffy": "straw hat wearing pirate with red vest",
+    };
+
+    const lowerName = characterName.toLowerCase();
+    let characterDesc = characterName;
+    
+    // Check if it's a known character and use generic description
+    for (const [key, desc] of Object.entries(characterMapping)) {
+      if (lowerName.includes(key)) {
+        characterDesc = desc;
+        break;
+      }
+    }
+
+    const prompt = `Create a 3D rendered avatar inspired by ${characterDesc} in ${styleDesc}. The character should have ${toneDesc} and be in a ${poseDesc} pose. 3D animation style, Pixar-quality rendering, highly detailed 3D model as a friendly teacher. Professional 3D character design, child-friendly, no background, transparent background, isolated character only. Ultra high resolution 3D render. Square format 1:1 aspect ratio.`;
 
     console.log("Generating 3D character with prompt:", prompt);
 

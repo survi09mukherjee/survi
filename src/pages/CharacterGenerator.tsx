@@ -1,37 +1,54 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronLeft, Sparkles, Play, Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
-import { LANGUAGES } from '@/data/languages';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Wand2, Sparkles, Volume2, Mic, Upload, RotateCw, ArrowLeft } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+
+type Step = 'input' | 'processing' | 'preview' | 'upload' | 'confirm';
+type ProcessingStage = 'searching' | 'removing' | 'rendering' | 'complete';
 
 export default function CharacterGenerator() {
   const navigate = useNavigate();
+  const [step, setStep] = useState<Step>('input');
   const [characterName, setCharacterName] = useState('');
   const [characterType, setCharacterType] = useState<'cartoon' | 'anime' | 'realistic'>('cartoon');
-  const [tone, setTone] = useState<'funny' | 'calm' | 'motivational' | 'storyteller'>('calm');
-  const [voiceLang, setVoiceLang] = useState('en');
-  const [style, setStyle] = useState('default');
+  const [tone, setTone] = useState<'funny' | 'calm' | 'motivational' | 'storyteller'>('funny');
+  const [voiceLanguage, setVoiceLanguage] = useState('en');
+  const [pose, setPose] = useState('wave');
+  const [outfit, setOutfit] = useState('default');
   const [generatedCharacter, setGeneratedCharacter] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [processingStage, setProcessingStage] = useState<ProcessingStage>('searching');
+  const [isListening, setIsListening] = useState(false);
+  const [isCopyrighted, setIsCopyrighted] = useState(false);
+  const [showLegalModal, setShowLegalModal] = useState(false);
+  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [hasImageRights, setHasImageRights] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const characterEmojis = {
-    cartoon: ['🧑‍🏫', '👨‍🔬', '👩‍🎨', '🧙‍♂️', '🦸‍♀️', '👨‍🚀'],
-    anime: ['🎭', '⚡', '🌸', '🎌', '🗾', '🎏'],
-    realistic: ['👨‍💼', '👩‍💻', '👨‍🎓', '👩‍🏫', '🧑‍🔬', '👨‍⚖️']
-  };
-
-  const stylePresets = {
-    cartoon: ['Friendly Teacher', 'Super Hero', 'Magical Wizard', 'Space Explorer'],
-    anime: ['Ninja Master', 'Samurai Sage', 'Kawaii Friend', 'Dragon Tamer'],
-    realistic: ['Professor', 'Scientist', 'Mentor', 'Coach']
-  };
+  const exampleCharacters = [
+    'Doraemon', 'Chhota Bheem', 'Naruto', 'Harry Potter', 'Batman', 'Shinchan'
+  ];
 
   const handleGenerate = async () => {
     if (!characterName.trim()) {
@@ -39,237 +56,470 @@ export default function CharacterGenerator() {
       return;
     }
 
-    setIsGenerating(true);
+    const lowerName = characterName.toLowerCase();
+    const copyrightedNames = ['doraemon', 'naruto', 'harry potter', 'batman', 'shinchan', 'chhota bheem', 'pokemon', 'mickey mouse', 'spider-man', 'iron man', 'thor', 'hulk', 'nobita', 'sinchan', 'gojo satoru', 'goku', 'luffy', 'pikachu'];
     
+    if (copyrightedNames.some(name => lowerName.includes(name))) {
+      setIsCopyrighted(true);
+      setShowLegalModal(true);
+    }
+
+    setStep('processing');
+    setIsGenerating(true);
+    setGeneratedCharacter(null);
+
     try {
+      // Simulate processing stages
+      setProcessingStage('searching');
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      setProcessingStage('removing');
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      setProcessingStage('rendering');
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
       const { data, error } = await supabase.functions.invoke('generate-character', {
         body: {
           characterName: characterName.trim(),
           characterType,
           tone,
-          style
-        }
+          style: outfit,
+          pose,
+        },
       });
 
       if (error) {
         console.error('Error generating character:', error);
-        toast.error(error.message || 'Failed to generate character');
+        toast.error('Failed to generate character. Please try again.');
+        setStep('input');
         return;
       }
 
       if (data?.imageUrl) {
         setGeneratedCharacter(data.imageUrl);
-        toast.success(data.message || 'Your AI Tutor has been created!');
+        setProcessingStage('complete');
+        setStep('preview');
+        toast.success(data.message || 'Character generated successfully!');
       } else {
-        toast.error('No image was generated');
+        toast.error('No character image was generated');
+        setStep('input');
       }
-    } catch (err) {
-      console.error('Error:', err);
-      toast.error('Failed to generate character. Please try again.');
+    } catch (error) {
+      console.error('Unexpected error:', error);
+      toast.error('An unexpected error occurred');
+      setStep('input');
     } finally {
       setIsGenerating(false);
     }
   };
 
+  const handleVoiceInput = () => {
+    if (!('webkitSpeechRecognition' in window)) {
+      toast.error('Voice input not supported in this browser');
+      return;
+    }
+
+    const recognition = new (window as any).webkitSpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.onstart = () => setIsListening(true);
+    recognition.onend = () => setIsListening(false);
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setCharacterName(transcript);
+    };
+    recognition.start();
+  };
+
   const handleTestVoice = () => {
-    const lang = LANGUAGES.find(l => l.code === voiceLang);
-    toast.info(`Testing voice in ${lang?.name}...`, {
-      description: 'Hello! I\'m your AI Tutor. Let\'s explore and learn together!'
-    });
+    toast.info(`Testing ${voiceLanguage} voice for ${characterName || 'character'}`);
+    // Mock voice preview
+  };
+
+  const handleRegenerate = () => {
+    setStep('input');
+    setGeneratedCharacter(null);
+  };
+
+  const handleUploadImage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setUploadedImage(e.target?.result as string);
+        setStep('upload');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleConfirmUpload = async () => {
+    if (!hasImageRights) {
+      toast.error('Please confirm you have rights to use this image');
+      return;
+    }
+    
+    setStep('processing');
+    setIsGenerating(true);
+    
+    // Simulate processing
+    setProcessingStage('removing');
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    setProcessingStage('rendering');
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    setGeneratedCharacter(uploadedImage);
+    setIsCopyrighted(false);
+    setStep('preview');
+    setIsGenerating(false);
+  };
+
+  const handleUseTutor = () => {
+    toast.success('Tutor assigned to your profile!');
+    setTimeout(() => navigate('/dashboard'), 1500);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-secondary/10">
-      {/* Header */}
-      <header className="bg-card/80 backdrop-blur-sm border-b shadow-sm">
-        <div className="max-w-6xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
-                <ChevronLeft />
-              </Button>
-              <div>
-                <h1 className="text-xl font-bold">Character Generator</h1>
-                <p className="text-sm text-muted-foreground">Create your perfect AI Tutor</p>
-              </div>
-            </div>
-          </div>
+    <div className="min-h-screen bg-gradient-to-b from-primary/5 to-background p-4">
+      <div className="max-w-4xl mx-auto">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+            Create My Tutor
+          </h1>
+          <p className="text-muted-foreground">
+            Design your perfect AI learning companion
+          </p>
         </div>
-      </header>
 
-      {/* Main Content */}
-      <main className="max-w-6xl mx-auto px-4 py-8">
-        <div className="grid md:grid-cols-2 gap-6">
-          {/* Configuration Panel */}
-          <div className="space-y-6">
-            {/* Character Name Input */}
-            <Card className="p-6 shadow-card animate-slide-up">
-              <Label className="text-base font-semibold mb-4 block">Character Name</Label>
-              <Input
-                placeholder="e.g., Doraemon, Goku, Harry Potter, Chota Bheem, Gojo Satoru..."
-                value={characterName}
-                onChange={(e) => setCharacterName(e.target.value)}
-                className="text-base"
-              />
-              <p className="text-xs text-muted-foreground mt-2">
-                💡 Try popular cartoon characters (Doraemon, Shinchan, Nobita), anime heroes (Goku, Naruto, Gojo), 
-                or movie characters (Harry Potter, Batman, Thor)!
-              </p>
-            </Card>
-
-            {/* Character Type */}
-            <Card className="p-6 shadow-card">
-              <Label className="text-base font-semibold mb-4 block">Character Type</Label>
-              <RadioGroup value={characterType} onValueChange={(v: any) => setCharacterType(v)}>
-                <div className="space-y-3">
-                  <div className="flex items-center space-x-3 p-3 rounded-lg hover:bg-accent cursor-pointer">
-                    <RadioGroupItem value="cartoon" id="cartoon" />
-                    <Label htmlFor="cartoon" className="flex-1 cursor-pointer">
-                      <div className="font-medium">🎨 Cartoon</div>
-                      <div className="text-xs text-muted-foreground">Fun and colorful animated style</div>
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-3 p-3 rounded-lg hover:bg-accent cursor-pointer">
-                    <RadioGroupItem value="anime" id="anime" />
-                    <Label htmlFor="anime" className="flex-1 cursor-pointer">
-                      <div className="font-medium">🎌 Anime</div>
-                      <div className="text-xs text-muted-foreground">Japanese animation inspired</div>
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-3 p-3 rounded-lg hover:bg-accent cursor-pointer">
-                    <RadioGroupItem value="realistic" id="realistic" />
-                    <Label htmlFor="realistic" className="flex-1 cursor-pointer">
-                      <div className="font-medium">👨‍🏫 Realistic Mentor</div>
-                      <div className="text-xs text-muted-foreground">Professional and relatable</div>
-                    </Label>
-                  </div>
-                </div>
-              </RadioGroup>
-            </Card>
-
-            {/* Teaching Tone */}
-            <Card className="p-6 shadow-card">
-              <Label className="text-base font-semibold mb-4 block">Teaching Tone</Label>
-              <RadioGroup value={tone} onValueChange={(v: any) => setTone(v)}>
-                <div className="grid grid-cols-2 gap-3">
-                  {['funny', 'calm', 'motivational', 'storyteller'].map((t) => (
-                    <div key={t} className="flex items-center space-x-2 p-3 rounded-lg hover:bg-accent cursor-pointer">
-                      <RadioGroupItem value={t} id={t} />
-                      <Label htmlFor={t} className="cursor-pointer capitalize">{t}</Label>
-                    </div>
-                  ))}
-                </div>
-              </RadioGroup>
-            </Card>
-
-            {/* Style Preset */}
-            <Card className="p-6 shadow-card">
-              <Label className="text-base font-semibold mb-4 block">Style Preset</Label>
-              <Select value={style} onValueChange={setStyle}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="default">Default Style</SelectItem>
-                  {stylePresets[characterType].map(s => (
-                    <SelectItem key={s} value={s.toLowerCase().replace(' ', '-')}>{s}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Card>
-
-            {/* Voice Language */}
-            <Card className="p-6 shadow-card">
-              <Label className="text-base font-semibold mb-4 block">Voice Language & Accent</Label>
-              <Select value={voiceLang} onValueChange={setVoiceLang}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {LANGUAGES.map(lang => (
-                    <SelectItem key={lang.code} value={lang.code}>
-                      {lang.flag} {lang.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button variant="outline" size="sm" className="w-full mt-3" onClick={handleTestVoice}>
-                <Play className="w-4 h-4 mr-2" />
-                Test Voice
-              </Button>
-            </Card>
-
-            <Button 
-              size="lg" 
-              variant="hero" 
-              className="w-full" 
-              onClick={handleGenerate}
-              disabled={isGenerating || !characterName.trim()}
-            >
-              {isGenerating ? (
-                <>
-                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                  Creating Your Character...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-5 h-5 mr-2" />
-                  Generate My AI Tutor
-                </>
-              )}
-            </Button>
-          </div>
-
-          {/* Preview Panel */}
-          <div className="space-y-6">
-            <Card className="p-8 shadow-card text-center">
-              <Label className="text-base font-semibold mb-6 block">Character Preview</Label>
-              <div className="bg-gradient-hero rounded-2xl p-12 mb-6 min-h-[320px] flex items-center justify-center">
-                {isGenerating ? (
-                  <div className="text-center">
-                    <Loader2 className="w-16 h-16 animate-spin text-primary mx-auto mb-4" />
-                    <p className="text-sm text-muted-foreground">Creating your AI character...</p>
-                  </div>
-                ) : generatedCharacter ? (
-                  <img 
-                    src={generatedCharacter} 
-                    alt="Generated AI Tutor" 
-                    className="max-w-full max-h-[280px] rounded-lg object-contain"
+        {/* Step 1: Input */}
+        {step === 'input' && (
+          <Card className="p-8">
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="characterName" className="text-lg">Type character name</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="characterName"
+                    placeholder="e.g., Doraemon, Harry Potter, Batman..."
+                    value={characterName}
+                    onChange={(e) => setCharacterName(e.target.value)}
+                    className="text-lg"
+                    onKeyDown={(e) => e.key === 'Enter' && handleGenerate()}
                   />
-                ) : (
-                  <div className="text-[120px] animate-bounce-subtle">❓</div>
-                )}
-              </div>
-              {generatedCharacter && (
-                <div className="space-y-4 animate-fade-in">
-                  <h3 className="text-xl font-bold">Your AI Tutor</h3>
-                  <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full">
-                    <span className="font-medium capitalize">{characterType}</span>
-                    <span>•</span>
-                    <span className="capitalize">{tone}</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                    {tone === 'funny' && "Hey there, superstar! Ready to have some fun while learning? Let's turn this lesson into an adventure!"}
-                    {tone === 'calm' && "Hello! Take a deep breath. Learning is a journey, and I'm here to guide you every step of the way."}
-                    {tone === 'motivational' && "You've got this, champion! Together, we're going to achieve amazing things. Let's get started!"}
-                    {tone === 'storyteller' && "Gather around, young explorer! Every lesson is a story waiting to unfold. Let me take you on this journey..."}
-                  </p>
-                  <Button variant="hero" size="lg" onClick={() => navigate('/dashboard')}>
-                    Start Learning Together
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={handleVoiceInput}
+                    className={isListening ? 'animate-pulse bg-primary/20' : ''}
+                  >
+                    <Mic className="w-4 h-4" />
                   </Button>
                 </div>
-              )}
-            </Card>
+              </div>
 
-            <Card className="p-6 bg-gradient-subtle">
-              <h4 className="font-semibold mb-2">💡 Pro Tip</h4>
-              <p className="text-sm text-muted-foreground">
-                You can create multiple characters and switch between them based on the subject or your mood!
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">Popular characters</Label>
+                <div className="flex flex-wrap gap-2">
+                  {exampleCharacters.map((char) => (
+                    <Button
+                      key={char}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCharacterName(char)}
+                    >
+                      {char}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Character Type</Label>
+                  <Select value={characterType} onValueChange={(value: any) => setCharacterType(value)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cartoon">Cartoon</SelectItem>
+                      <SelectItem value="anime">Anime</SelectItem>
+                      <SelectItem value="realistic">Realistic</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Teaching Tone</Label>
+                  <Select value={tone} onValueChange={(value: any) => setTone(value)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="funny">Funny & Playful</SelectItem>
+                      <SelectItem value="calm">Calm & Patient</SelectItem>
+                      <SelectItem value="motivational">Motivational</SelectItem>
+                      <SelectItem value="storyteller">Storyteller</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <Button 
+                onClick={handleGenerate} 
+                disabled={!characterName.trim()}
+                className="w-full"
+                size="lg"
+              >
+                <Wand2 className="w-4 h-4 mr-2" />
+                Find/Create Tutor
+              </Button>
+
+              <p className="text-xs text-center text-muted-foreground border-t pt-4">
+                <strong>Note:</strong> If you choose a copyrighted character, the app will simulate a learning avatar. 
+                For real use, upload an image you own or ensure licensing.
               </p>
-            </Card>
-          </div>
-        </div>
-      </main>
+            </div>
+          </Card>
+        )}
+
+        {/* Step 2: Processing */}
+        {step === 'processing' && (
+          <Card className="p-12">
+            <div className="text-center space-y-6">
+              <div className="w-20 h-20 mx-auto bg-primary/10 rounded-full flex items-center justify-center">
+                <Sparkles className="w-10 h-10 text-primary animate-pulse" />
+              </div>
+              
+              <div className="space-y-2">
+                <h3 className="text-2xl font-bold">Creating Your Tutor</h3>
+                <p className="text-muted-foreground">
+                  {processingStage === 'searching' && 'Searching web references...'}
+                  {processingStage === 'removing' && 'Removing background...'}
+                  {processingStage === 'rendering' && 'Rendering 3D preview...'}
+                </p>
+              </div>
+
+              <div className="flex justify-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${processingStage === 'searching' ? 'bg-primary animate-bounce' : 'bg-muted'}`} />
+                <div className={`w-2 h-2 rounded-full ${processingStage === 'removing' ? 'bg-primary animate-bounce' : 'bg-muted'}`} style={{ animationDelay: '0.1s' }} />
+                <div className={`w-2 h-2 rounded-full ${processingStage === 'rendering' ? 'bg-primary animate-bounce' : 'bg-muted'}`} style={{ animationDelay: '0.2s' }} />
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* Step 3: Preview */}
+        {step === 'preview' && generatedCharacter && (
+          <Card className="p-6">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setStep('input')}
+              className="mb-4"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back
+            </Button>
+
+            <div className="space-y-6">
+              {isCopyrighted && (
+                <Badge variant="outline" className="w-full justify-center py-2">
+                  Simulated avatar — not the original IP
+                </Badge>
+              )}
+
+              <div className="aspect-square bg-gradient-to-br from-primary/10 to-secondary/10 rounded-lg flex items-center justify-center overflow-hidden">
+                <img 
+                  src={generatedCharacter} 
+                  alt="Generated character" 
+                  className="w-full h-full object-contain hover:scale-105 transition-transform"
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-2">
+                  <Label className="text-xs">Pose</Label>
+                  <Select value={pose} onValueChange={setPose}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="wave">Wave</SelectItem>
+                      <SelectItem value="nod">Nod</SelectItem>
+                      <SelectItem value="point">Point</SelectItem>
+                      <SelectItem value="thumbs-up">Thumbs Up</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs">Outfit</Label>
+                  <Select value={outfit} onValueChange={setOutfit}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="default">Default</SelectItem>
+                      <SelectItem value="formal">Formal</SelectItem>
+                      <SelectItem value="casual">Casual</SelectItem>
+                      <SelectItem value="sporty">Sporty</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs">Language</Label>
+                  <Select value={voiceLanguage} onValueChange={setVoiceLanguage}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="en">English</SelectItem>
+                      <SelectItem value="hi">Hindi</SelectItem>
+                      <SelectItem value="es">Spanish</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={handleTestVoice}
+              >
+                <Volume2 className="w-4 h-4 mr-2" />
+                Preview Voice
+              </Button>
+
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  onClick={handleRegenerate}
+                  className="flex-1"
+                >
+                  <RotateCw className="w-4 h-4 mr-2" />
+                  Regenerate
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex-1"
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Upload My Image
+                </Button>
+              </div>
+
+              <Button
+                onClick={handleUseTutor}
+                size="lg"
+                className="w-full"
+              >
+                Use as My Tutor
+              </Button>
+            </div>
+          </Card>
+        )}
+
+        {/* Step 4: Upload */}
+        {step === 'upload' && (
+          <Card className="p-8">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setStep('preview')}
+              className="mb-4"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back
+            </Button>
+
+            <div className="space-y-6">
+              <div className="text-center space-y-2">
+                <h3 className="text-xl font-bold">Upload Your Image</h3>
+                <p className="text-sm text-muted-foreground">
+                  Upload an image you own or have licensing rights to use
+                </p>
+              </div>
+
+              {uploadedImage && (
+                <div className="aspect-square bg-muted rounded-lg overflow-hidden">
+                  <img 
+                    src={uploadedImage} 
+                    alt="Uploaded" 
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+              )}
+
+              <div className="flex items-start space-x-3 p-4 border rounded-lg">
+                <Checkbox 
+                  id="rights" 
+                  checked={hasImageRights}
+                  onCheckedChange={(checked) => setHasImageRights(checked as boolean)}
+                />
+                <Label htmlFor="rights" className="text-sm leading-relaxed cursor-pointer">
+                  I confirm I have the legal rights to use this image for creating an AI tutor avatar
+                </Label>
+              </div>
+
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex-1"
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Choose Different Image
+                </Button>
+                <Button
+                  onClick={handleConfirmUpload}
+                  disabled={!hasImageRights}
+                  className="flex-1"
+                >
+                  Process Image
+                </Button>
+              </div>
+            </div>
+          </Card>
+        )}
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/jpg"
+          onChange={handleUploadImage}
+          className="hidden"
+        />
+
+        {/* Legal Modal */}
+        <Dialog open={showLegalModal} onOpenChange={setShowLegalModal}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Copyright Notice</DialogTitle>
+              <DialogDescription className="space-y-3 pt-2">
+                <p>
+                  The character you've requested may be protected by copyright. 
+                  This app will create a simulated learning avatar inspired by the character's style.
+                </p>
+                <p>
+                  For commercial use or exact character likeness, please:
+                </p>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>Upload your own image</li>
+                  <li>Ensure you have proper licensing</li>
+                  <li>Use generic character designs</li>
+                </ul>
+              </DialogDescription>
+            </DialogHeader>
+            <Button onClick={() => setShowLegalModal(false)}>
+              I Understand
+            </Button>
+          </DialogContent>
+        </Dialog>
+      </div>
     </div>
   );
 }
