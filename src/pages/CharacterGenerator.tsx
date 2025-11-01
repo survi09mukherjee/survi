@@ -3,19 +3,23 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronLeft, Sparkles, Play } from 'lucide-react';
+import { ChevronLeft, Sparkles, Play, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { LANGUAGES } from '@/data/languages';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function CharacterGenerator() {
   const navigate = useNavigate();
+  const [characterName, setCharacterName] = useState('');
   const [characterType, setCharacterType] = useState<'cartoon' | 'anime' | 'realistic'>('cartoon');
   const [tone, setTone] = useState<'funny' | 'calm' | 'motivational' | 'storyteller'>('calm');
   const [voiceLang, setVoiceLang] = useState('en');
   const [style, setStyle] = useState('default');
   const [generatedCharacter, setGeneratedCharacter] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const characterEmojis = {
     cartoon: ['🧑‍🏫', '👨‍🔬', '👩‍🎨', '🧙‍♂️', '🦸‍♀️', '👨‍🚀'],
@@ -29,11 +33,42 @@ export default function CharacterGenerator() {
     realistic: ['Professor', 'Scientist', 'Mentor', 'Coach']
   };
 
-  const handleGenerate = () => {
-    const emojis = characterEmojis[characterType];
-    const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
-    setGeneratedCharacter(randomEmoji);
-    toast.success('Your AI Tutor has been created!');
+  const handleGenerate = async () => {
+    if (!characterName.trim()) {
+      toast.error('Please enter a character name');
+      return;
+    }
+
+    setIsGenerating(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-character', {
+        body: {
+          characterName: characterName.trim(),
+          characterType,
+          tone,
+          style
+        }
+      });
+
+      if (error) {
+        console.error('Error generating character:', error);
+        toast.error(error.message || 'Failed to generate character');
+        return;
+      }
+
+      if (data?.imageUrl) {
+        setGeneratedCharacter(data.imageUrl);
+        toast.success(data.message || 'Your AI Tutor has been created!');
+      } else {
+        toast.error('No image was generated');
+      }
+    } catch (err) {
+      console.error('Error:', err);
+      toast.error('Failed to generate character. Please try again.');
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handleTestVoice = () => {
@@ -67,8 +102,23 @@ export default function CharacterGenerator() {
         <div className="grid md:grid-cols-2 gap-6">
           {/* Configuration Panel */}
           <div className="space-y-6">
-            {/* Character Type */}
+            {/* Character Name Input */}
             <Card className="p-6 shadow-card animate-slide-up">
+              <Label className="text-base font-semibold mb-4 block">Character Name</Label>
+              <Input
+                placeholder="e.g., Doraemon, Goku, Harry Potter, Chota Bheem, Gojo Satoru..."
+                value={characterName}
+                onChange={(e) => setCharacterName(e.target.value)}
+                className="text-base"
+              />
+              <p className="text-xs text-muted-foreground mt-2">
+                💡 Try popular cartoon characters (Doraemon, Shinchan, Nobita), anime heroes (Goku, Naruto, Gojo), 
+                or movie characters (Harry Potter, Batman, Thor)!
+              </p>
+            </Card>
+
+            {/* Character Type */}
+            <Card className="p-6 shadow-card">
               <Label className="text-base font-semibold mb-4 block">Character Type</Label>
               <RadioGroup value={characterType} onValueChange={(v: any) => setCharacterType(v)}>
                 <div className="space-y-3">
@@ -149,9 +199,24 @@ export default function CharacterGenerator() {
               </Button>
             </Card>
 
-            <Button size="lg" variant="hero" className="w-full" onClick={handleGenerate}>
-              <Sparkles className="w-5 h-5 mr-2" />
-              Generate My AI Tutor
+            <Button 
+              size="lg" 
+              variant="hero" 
+              className="w-full" 
+              onClick={handleGenerate}
+              disabled={isGenerating || !characterName.trim()}
+            >
+              {isGenerating ? (
+                <>
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  Creating Your Character...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-5 h-5 mr-2" />
+                  Generate My AI Tutor
+                </>
+              )}
             </Button>
           </div>
 
@@ -159,10 +224,21 @@ export default function CharacterGenerator() {
           <div className="space-y-6">
             <Card className="p-8 shadow-card text-center">
               <Label className="text-base font-semibold mb-6 block">Character Preview</Label>
-              <div className="bg-gradient-hero rounded-2xl p-12 mb-6">
-                <div className="text-[160px] animate-bounce-subtle">
-                  {generatedCharacter || '❓'}
-                </div>
+              <div className="bg-gradient-hero rounded-2xl p-12 mb-6 min-h-[320px] flex items-center justify-center">
+                {isGenerating ? (
+                  <div className="text-center">
+                    <Loader2 className="w-16 h-16 animate-spin text-primary mx-auto mb-4" />
+                    <p className="text-sm text-muted-foreground">Creating your AI character...</p>
+                  </div>
+                ) : generatedCharacter ? (
+                  <img 
+                    src={generatedCharacter} 
+                    alt="Generated AI Tutor" 
+                    className="max-w-full max-h-[280px] rounded-lg object-contain"
+                  />
+                ) : (
+                  <div className="text-[120px] animate-bounce-subtle">❓</div>
+                )}
               </div>
               {generatedCharacter && (
                 <div className="space-y-4 animate-fade-in">
