@@ -40,9 +40,9 @@ serve(async (req) => {
                      tone === "motivational" ? "energetic, inspiring pose" :
                      "wise, storytelling expression";
 
-    const prompt = `Create a high-quality, ${styleDesc}, featuring ${characterName} character as a friendly teacher. The character should have ${toneDesc}. The character is teaching and gesturing in a welcoming way. Professional illustration, child-friendly, educational context. Ultra high resolution. Teacher portrait. Square format 1:1 aspect ratio.`;
+    const prompt = `Create a 3D rendered avatar of ${characterName} character in ${styleDesc}. The character should have ${toneDesc}. 3D animation style, Pixar-quality rendering, highly detailed 3D model, animated character pose as a friendly teacher gesturing welcomingly. Professional 3D character design, child-friendly, no background, isolated character only. Ultra high resolution 3D render. Square format 1:1 aspect ratio.`;
 
-    console.log("Generating character with prompt:", prompt);
+    console.log("Generating 3D character with prompt:", prompt);
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -51,14 +51,17 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image",
+        model: "gpt-image-1",
         messages: [
           {
             role: "user",
             content: prompt
           }
         ],
-        modalities: ["image", "text"]
+        modalities: ["image", "text"],
+        background: "transparent",
+        output_format: "png",
+        quality: "high"
       }),
     });
 
