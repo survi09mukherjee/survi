@@ -14,7 +14,201 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      doubt_sessions: {
+        Row: {
+          created_at: string
+          doubt_text: string | null
+          id: string
+          resolution_type: string | null
+          resolved: boolean | null
+          topic_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          doubt_text?: string | null
+          id?: string
+          resolution_type?: string | null
+          resolved?: boolean | null
+          topic_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          doubt_text?: string | null
+          id?: string
+          resolution_type?: string | null
+          resolved?: boolean | null
+          topic_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "doubt_sessions_topic_id_fkey"
+            columns: ["topic_id"]
+            isOneToOne: false
+            referencedRelation: "multiplication_topics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      multiplication_topics: {
+        Row: {
+          badge_icon: string | null
+          created_at: string
+          description: string | null
+          id: string
+          level: string
+          order_index: number
+          title: string
+          video_duration: number | null
+          xp_reward: number | null
+        }
+        Insert: {
+          badge_icon?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          level: string
+          order_index: number
+          title: string
+          video_duration?: number | null
+          xp_reward?: number | null
+        }
+        Update: {
+          badge_icon?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          level?: string
+          order_index?: number
+          title?: string
+          video_duration?: number | null
+          xp_reward?: number | null
+        }
+        Relationships: []
+      }
+      quiz_attempts: {
+        Row: {
+          attempt_number: number | null
+          created_at: string
+          id: string
+          passed: boolean | null
+          score: number
+          topic_id: string
+          total_questions: number
+          user_id: string
+        }
+        Insert: {
+          attempt_number?: number | null
+          created_at?: string
+          id?: string
+          passed?: boolean | null
+          score: number
+          topic_id: string
+          total_questions: number
+          user_id: string
+        }
+        Update: {
+          attempt_number?: number | null
+          created_at?: string
+          id?: string
+          passed?: boolean | null
+          score?: number
+          topic_id?: string
+          total_questions?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_attempts_topic_id_fkey"
+            columns: ["topic_id"]
+            isOneToOne: false
+            referencedRelation: "multiplication_topics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_avatars: {
+        Row: {
+          character_name: string
+          character_type: string
+          created_at: string
+          id: string
+          image_url: string
+          is_active: boolean | null
+          tone: string
+          user_id: string
+        }
+        Insert: {
+          character_name: string
+          character_type: string
+          created_at?: string
+          id?: string
+          image_url: string
+          is_active?: boolean | null
+          tone: string
+          user_id: string
+        }
+        Update: {
+          character_name?: string
+          character_type?: string
+          created_at?: string
+          id?: string
+          image_url?: string
+          is_active?: boolean | null
+          tone?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_multiplication_progress: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          id: string
+          quiz_completed: boolean | null
+          quiz_score: number | null
+          revision_completed: boolean | null
+          topic_id: string
+          unlocked: boolean | null
+          user_id: string
+          video_completed: boolean | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          quiz_completed?: boolean | null
+          quiz_score?: number | null
+          revision_completed?: boolean | null
+          topic_id: string
+          unlocked?: boolean | null
+          user_id: string
+          video_completed?: boolean | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          quiz_completed?: boolean | null
+          quiz_score?: number | null
+          revision_completed?: boolean | null
+          topic_id?: string
+          unlocked?: boolean | null
+          user_id?: string
+          video_completed?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_multiplication_progress_topic_id_fkey"
+            columns: ["topic_id"]
+            isOneToOne: false
+            referencedRelation: "multiplication_topics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
