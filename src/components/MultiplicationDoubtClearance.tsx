@@ -39,16 +39,17 @@ export default function MultiplicationDoubtClearance({
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
 
-      // Save doubt session
-      await supabase.from('doubt_sessions').insert({
-        user_id: user.id,
-        topic_id: topic.id,
-        doubt_text: doubt,
-        resolution_type: resolutionType,
-        resolved: false
-      });
+      // Save doubt session only if authenticated
+      if (user) {
+        await supabase.from('doubt_sessions').insert({
+          user_id: user.id,
+          topic_id: topic.id,
+          doubt_text: doubt,
+          resolution_type: resolutionType,
+          resolved: false
+        });
+      }
 
       // Simulate AI response (in production, this would call an edge function)
       setResponse(

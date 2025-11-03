@@ -49,15 +49,9 @@ export default function MultiplicationRoadmap() {
   const loadData = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast({
-          title: "Error",
-          description: "Please sign in to access multiplication learning",
-          variant: "destructive"
-        });
-        navigate('/');
-        return;
-      }
+      
+      // Create a temporary user ID if not authenticated (for demo purposes)
+      const userId = user?.id || 'demo-user-' + Math.random().toString(36).substr(2, 9);
 
       // Load topics
       const { data: topicsData, error: topicsError } = await supabase
@@ -68,40 +62,49 @@ export default function MultiplicationRoadmap() {
       if (topicsError) throw topicsError;
       setTopics(topicsData || []);
 
-      // Load user progress
-      const { data: progressData, error: progressError } = await supabase
-        .from('user_multiplication_progress')
-        .select('*')
-        .eq('user_id', user.id);
+      // Load user progress (only if authenticated)
+      let progressData = null;
+      let progressError = null;
+      
+      if (user) {
+        const result = await supabase
+          .from('user_multiplication_progress')
+          .select('*')
+          .eq('user_id', user.id);
+        progressData = result.data;
+        progressError = result.error;
+      }
 
       if (progressError) throw progressError;
 
       // Initialize progress if empty
       if (!progressData || progressData.length === 0) {
-        const initialProgress = topicsData?.map((topic, index) => ({
-          user_id: user.id,
-          topic_id: topic.id,
-          unlocked: index === 0
-        })) || [];
-
-        const { error: insertError } = await supabase
-          .from('user_multiplication_progress')
-          .insert(initialProgress);
-
-        if (insertError) throw insertError;
-
+        // Create initial progress map locally (don't save to DB if not authenticated)
         const progressMap: Record<string, UserProgress> = {};
-        initialProgress.forEach(p => {
-          progressMap[p.topic_id] = {
-            topic_id: p.topic_id,
+        topicsData?.forEach((topic, index) => {
+          progressMap[topic.id] = {
+            topic_id: topic.id,
             video_completed: false,
             quiz_completed: false,
             quiz_score: 0,
             revision_completed: false,
-            unlocked: p.unlocked
+            unlocked: index === 0
           };
         });
         setUserProgress(progressMap);
+        
+        // Save to DB only if authenticated
+        if (user) {
+          const initialProgress = topicsData?.map((topic, index) => ({
+            user_id: user.id,
+            topic_id: topic.id,
+            unlocked: index === 0
+          })) || [];
+
+          await supabase
+            .from('user_multiplication_progress')
+            .insert(initialProgress);
+        }
       } else {
         const progressMap: Record<string, UserProgress> = {};
         progressData.forEach(p => {
@@ -116,17 +119,19 @@ export default function MultiplicationRoadmap() {
       }, 0) || 0;
       setTotalXP(xp);
 
-      // Check if user has avatar
-      const { data: avatarData } = await supabase
-        .from('user_avatars')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .single();
+      // Check if user has avatar (only if authenticated)
+      if (user) {
+        const { data: avatarData } = await supabase
+          .from('user_avatars')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .maybeSingle();
 
-      if (avatarData) {
-        setSelectedAvatar(avatarData);
-        setStep('roadmap');
+        if (avatarData) {
+          setSelectedAvatar(avatarData);
+          setStep('roadmap');
+        }
       }
 
       setLoading(false);
@@ -167,30 +172,54 @@ export default function MultiplicationRoadmap() {
 
   const handleQuizComplete = async (passed: boolean, score: number) => {
     if (passed) {
-      // Update progress
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      await supabase
-        .from('user_multiplication_progress')
-        .update({ 
+      // Update progress locally
+      const updatedProgress = { ...userProgress };
+      if (currentTopic) {
+        updatedProgress[currentTopic.id] = {
+          ...updatedProgress[currentTopic.id],
           video_completed: true,
           quiz_completed: true,
           quiz_score: score,
           revision_completed: true
-        })
-        .eq('user_id', user.id)
-        .eq('topic_id', currentTopic?.id);
-
-      // Unlock next topic
-      const currentIndex = topics.findIndex(t => t.id === currentTopic?.id);
-      if (currentIndex < topics.length - 1) {
-        const nextTopic = topics[currentIndex + 1];
+        };
+        
+        // Unlock next topic
+        const currentIndex = topics.findIndex(t => t.id === currentTopic?.id);
+        if (currentIndex < topics.length - 1) {
+          const nextTopic = topics[currentIndex + 1];
+          updatedProgress[nextTopic.id] = {
+            ...updatedProgress[nextTopic.id],
+            unlocked: true
+          };
+        }
+        
+        setUserProgress(updatedProgress);
+      }
+      
+      // Update in database if authenticated
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user && currentTopic) {
         await supabase
           .from('user_multiplication_progress')
-          .update({ unlocked: true })
+          .update({ 
+            video_completed: true,
+            quiz_completed: true,
+            quiz_score: score,
+            revision_completed: true
+          })
           .eq('user_id', user.id)
-          .eq('topic_id', nextTopic.id);
+          .eq('topic_id', currentTopic.id);
+
+        // Unlock next topic in DB
+        const currentIndex = topics.findIndex(t => t.id === currentTopic?.id);
+        if (currentIndex < topics.length - 1) {
+          const nextTopic = topics[currentIndex + 1];
+          await supabase
+            .from('user_multiplication_progress')
+            .update({ unlocked: true })
+            .eq('user_id', user.id)
+            .eq('topic_id', nextTopic.id);
+        }
       }
 
       toast({

@@ -56,7 +56,6 @@ export default function MultiplicationAvatarSelect({ onComplete }: Multiplicatio
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
 
       const { data, error } = await supabase.functions.invoke('generate-character', {
         body: {
@@ -70,28 +69,39 @@ export default function MultiplicationAvatarSelect({ onComplete }: Multiplicatio
 
       if (error) throw error;
 
-      // Save avatar to database
-      const { data: avatarData, error: avatarError } = await supabase
-        .from('user_avatars')
-        .insert({
-          user_id: user.id,
-          character_name: characterName,
-          character_type: 'cartoon',
-          tone: 'motivational',
-          image_url: data.imageUrl,
-          is_active: true
-        })
-        .select()
-        .single();
+      // Prepare avatar data
+      const avatarData = {
+        character_name: characterName,
+        character_type: 'cartoon',
+        tone: 'motivational',
+        image_url: data.imageUrl,
+        is_active: true
+      };
 
-      if (avatarError) throw avatarError;
+      // Save avatar to database only if authenticated
+      if (user) {
+        const { data: savedAvatar, error: avatarError } = await supabase
+          .from('user_avatars')
+          .insert({
+            user_id: user.id,
+            ...avatarData
+          })
+          .select()
+          .single();
+
+        if (!avatarError && savedAvatar) {
+          onComplete(savedAvatar);
+        } else {
+          onComplete(avatarData);
+        }
+      } else {
+        onComplete(avatarData);
+      }
 
       toast({
         title: "Success! 🎉",
         description: `${characterName} is ready to teach!`
       });
-
-      onComplete(avatarData);
     } catch (error) {
       console.error('Error generating avatar:', error);
       toast({
