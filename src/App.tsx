@@ -15,6 +15,7 @@ import CharacterGenerator from "./pages/CharacterGenerator";
 import VideoLesson from "./pages/VideoLesson";
 import LessonLibrary from "./pages/LessonLibrary";
 import LanguageHub from "./pages/LanguageHub";
+import MultiplicationRoadmap from "./pages/MultiplicationRoadmap";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,6 +39,7 @@ const App = () => (
           <Route path="/video-lesson" element={<VideoLesson />} />
           <Route path="/lesson-library" element={<LessonLibrary />} />
           <Route path="/language-hub" element={<LanguageHub />} />
+          <Route path="/multiplication" element={<MultiplicationRoadmap />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
