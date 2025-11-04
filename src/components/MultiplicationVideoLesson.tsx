@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { ArrowLeft, Play, Pause, Volume2, VolumeX } from 'lucide-react';
+import { ArrowLeft, Play, Pause, Volume2, VolumeX, Loader2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/components/ui/use-toast';
 
 interface MultiplicationVideoLessonProps {
   topic: any;
@@ -17,27 +19,109 @@ export default function MultiplicationVideoLesson({
   onComplete,
   onBack
 }: MultiplicationVideoLessonProps) {
+  const { toast } = useToast();
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
-  const [duration] = useState(300); // 5 minutes default
+  const [isGenerating, setIsGenerating] = useState(true);
+  const [lessonScript, setLessonScript] = useState('');
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [duration, setDuration] = useState(0);
 
+  // Generate narration on component mount
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isPlaying && progress < 100) {
-      interval = setInterval(() => {
-        setProgress(prev => {
-          const newProgress = prev + (100 / duration);
-          if (newProgress >= 100) {
-            setIsPlaying(false);
-            return 100;
+    const generateNarration = async () => {
+      try {
+        setIsGenerating(true);
+        const { data, error } = await supabase.functions.invoke('generate-lesson-narration', {
+          body: {
+            topicTitle: topic.title,
+            topicDescription: topic.description,
+            characterName: avatar.character_name
           }
-          return newProgress;
         });
-      }, 1000);
+
+        if (error) throw error;
+
+        if (data.audioContent) {
+          // Convert base64 to blob and create URL
+          const byteCharacters = atob(data.audioContent);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: 'audio/mpeg' });
+          const url = URL.createObjectURL(blob);
+          setAudioUrl(url);
+          setLessonScript(data.script);
+
+          // Create audio element
+          const audio = new Audio(url);
+          audioRef.current = audio;
+
+          // Set duration when metadata loads
+          audio.addEventListener('loadedmetadata', () => {
+            setDuration(audio.duration);
+          });
+
+          // Update progress during playback
+          audio.addEventListener('timeupdate', () => {
+            if (audio.duration) {
+              setProgress((audio.currentTime / audio.duration) * 100);
+            }
+          });
+
+          // Handle end of playback
+          audio.addEventListener('ended', () => {
+            setIsPlaying(false);
+            setProgress(100);
+          });
+
+          toast({
+            title: "Lesson Ready! 🎓",
+            description: `${avatar.character_name} is ready to teach!`,
+          });
+        }
+      } catch (error) {
+        console.error('Error generating narration:', error);
+        toast({
+          title: "Error",
+          description: "Failed to generate lesson narration. Using demo mode.",
+          variant: "destructive",
+        });
+        // Fallback to timer-based demo
+        setDuration(180);
+      } finally {
+        setIsGenerating(false);
+      }
+    };
+
+    generateNarration();
+
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      if (audioUrl) {
+        URL.revokeObjectURL(audioUrl);
+      }
+    };
+  }, [topic, avatar]);
+
+  // Handle play/pause
+  useEffect(() => {
+    if (audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.play();
+      } else {
+        audioRef.current.pause();
+      }
+      audioRef.current.muted = isMuted;
     }
-    return () => clearInterval(interval);
-  }, [isPlaying, progress, duration]);
+  }, [isPlaying, isMuted]);
 
   const handleComplete = () => {
     if (progress >= 80) {
@@ -65,31 +149,48 @@ export default function MultiplicationVideoLesson({
         <Card className="overflow-hidden">
           {/* Video Display Area */}
           <div className="relative bg-gradient-hero aspect-video flex items-center justify-center">
-            {/* Avatar */}
-            <div className="relative">
-              <img
-                src={avatar.image_url}
-                alt="Tutor Avatar"
-                className="w-64 h-64 object-contain animate-bounce-subtle"
-              />
-              {isPlaying && (
-                <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 bg-card px-4 py-2 rounded-full shadow-lg">
-                  <p className="text-sm font-medium">Teaching {topic.title}...</p>
-                </div>
-              )}
-            </div>
-
-            {/* Play/Pause Overlay */}
-            {!isPlaying && progress === 0 && (
-              <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
-                <Button
-                  size="lg"
-                  className="rounded-full w-20 h-20"
-                  onClick={() => setIsPlaying(true)}
-                >
-                  <Play className="w-8 h-8" />
-                </Button>
+            {isGenerating ? (
+              <div className="flex flex-col items-center gap-4">
+                <Loader2 className="w-12 h-12 animate-spin text-primary" />
+                <p className="text-lg font-medium">Generating lesson narration...</p>
+                <p className="text-sm text-muted-foreground">{avatar.character_name} is preparing to teach!</p>
               </div>
+            ) : (
+              <>
+                {/* Avatar */}
+                <div className="relative">
+                  <img
+                    src={avatar.image_url}
+                    alt="Tutor Avatar"
+                    className={`w-64 h-64 object-contain transition-transform ${
+                      isPlaying ? 'animate-bounce-subtle scale-105' : ''
+                    }`}
+                  />
+                  {isPlaying && (
+                    <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 bg-card px-4 py-2 rounded-full shadow-lg animate-pulse">
+                      <p className="text-sm font-medium">🎙️ Teaching {topic.title}...</p>
+                    </div>
+                  )}
+                  {!isPlaying && progress > 0 && progress < 100 && (
+                    <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 bg-card px-4 py-2 rounded-full shadow-lg">
+                      <p className="text-sm font-medium">⏸️ Paused</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Play/Pause Overlay */}
+                {!isPlaying && progress === 0 && !isGenerating && (
+                  <div className="absolute inset-0 bg-black/20 flex items-center justify-center backdrop-blur-sm">
+                    <Button
+                      size="lg"
+                      className="rounded-full w-20 h-20 shadow-2xl"
+                      onClick={() => setIsPlaying(true)}
+                    >
+                      <Play className="w-8 h-8 ml-1" />
+                    </Button>
+                  </div>
+                )}
+              </>
             )}
           </div>
 
@@ -99,8 +200,16 @@ export default function MultiplicationVideoLesson({
             <div className="space-y-2">
               <Progress value={progress} className="h-2" />
               <div className="flex items-center justify-between text-sm text-muted-foreground">
-                <span>{Math.floor((progress / 100) * duration)}s</span>
-                <span>{duration}s</span>
+                <span>
+                  {audioRef.current ? 
+                    `${Math.floor(audioRef.current.currentTime / 60)}:${String(Math.floor(audioRef.current.currentTime % 60)).padStart(2, '0')}` 
+                    : '0:00'}
+                </span>
+                <span>
+                  {duration ? 
+                    `${Math.floor(duration / 60)}:${String(Math.floor(duration % 60)).padStart(2, '0')}` 
+                    : '--:--'}
+                </span>
               </div>
             </div>
 
@@ -111,7 +220,7 @@ export default function MultiplicationVideoLesson({
                   variant="outline"
                   size="icon"
                   onClick={() => setIsPlaying(!isPlaying)}
-                  disabled={progress >= 100}
+                  disabled={progress >= 100 || isGenerating || !audioUrl}
                 >
                   {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
                 </Button>
@@ -145,6 +254,16 @@ export default function MultiplicationVideoLesson({
             <p>🏆 Unlock badge: {topic.badge_icon}</p>
           </div>
         </Card>
+
+        {/* Lesson Script */}
+        {lessonScript && (
+          <Card className="mt-6 p-6">
+            <h3 className="font-semibold mb-3">📜 Lesson Transcript</h3>
+            <div className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
+              {lessonScript}
+            </div>
+          </Card>
+        )}
       </main>
     </div>
   );
