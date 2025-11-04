@@ -42,16 +42,7 @@ export default function MultiplicationAvatarSelect({ onComplete }: Multiplicatio
     recognition.start();
   };
 
-  const handleGenerate = async () => {
-    if (!characterName.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter a character name",
-        variant: "destructive"
-      });
-      return;
-    }
-
+  const generateWithCharacter = async (charName: string) => {
     setIsGenerating(true);
 
     try {
@@ -59,7 +50,7 @@ export default function MultiplicationAvatarSelect({ onComplete }: Multiplicatio
 
       const { data, error } = await supabase.functions.invoke('generate-character', {
         body: {
-          characterName: characterName,
+          characterName: charName,
           characterType: 'cartoon',
           tone: 'motivational',
           style: 'friendly teacher',
@@ -71,7 +62,7 @@ export default function MultiplicationAvatarSelect({ onComplete }: Multiplicatio
 
       // Prepare avatar data
       const avatarData = {
-        character_name: characterName,
+        character_name: charName,
         character_type: 'cartoon',
         tone: 'motivational',
         image_url: data.imageUrl,
@@ -100,7 +91,7 @@ export default function MultiplicationAvatarSelect({ onComplete }: Multiplicatio
 
       toast({
         title: "Success! 🎉",
-        description: `${characterName} is ready to teach!`
+        description: `${charName} is ready to teach!`
       });
     } catch (error) {
       console.error('Error generating avatar:', error);
@@ -112,6 +103,24 @@ export default function MultiplicationAvatarSelect({ onComplete }: Multiplicatio
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const handleGenerate = async () => {
+    if (!characterName.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a character name",
+        variant: "destructive"
+      });
+      return;
+    }
+    await generateWithCharacter(characterName);
+  };
+
+  const handleContinueWithoutAvatar = async () => {
+    const randomChar = CHARACTER_EXAMPLES[Math.floor(Math.random() * CHARACTER_EXAMPLES.length)];
+    setCharacterName(randomChar);
+    await generateWithCharacter(randomChar);
   };
 
   return (
@@ -172,22 +181,33 @@ export default function MultiplicationAvatarSelect({ onComplete }: Multiplicatio
           </p>
         </div>
 
-        {/* Generate Button */}
-        <Button
-          onClick={handleGenerate}
-          disabled={isGenerating || !characterName.trim()}
-          className="w-full"
-          size="lg"
-        >
-          {isGenerating ? (
-            <>
-              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-              Generating Your Tutor...
-            </>
-          ) : (
-            'Generate My Tutor'
-          )}
-        </Button>
+        {/* Generate Buttons */}
+        <div className="flex gap-3">
+          <Button
+            onClick={handleGenerate}
+            disabled={isGenerating || !characterName.trim()}
+            className="flex-1"
+            size="lg"
+          >
+            {isGenerating ? (
+              <>
+                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                Generating Your Tutor...
+              </>
+            ) : (
+              'Generate My Tutor'
+            )}
+          </Button>
+          <Button
+            onClick={handleContinueWithoutAvatar}
+            disabled={isGenerating}
+            variant="outline"
+            className="flex-1"
+            size="lg"
+          >
+            Continue without avatar
+          </Button>
+        </div>
       </Card>
     </div>
   );
