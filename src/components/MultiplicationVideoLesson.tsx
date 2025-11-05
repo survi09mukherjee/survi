@@ -25,7 +25,10 @@ export default function MultiplicationVideoLesson({
   const [isMuted, setIsMuted] = useState(false);
   const [isGenerating, setIsGenerating] = useState(true);
   const [lessonScript, setLessonScript] = useState('');
+  const [videoUrl, setVideoUrl] = useState('');
+  const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const animationRef = useRef<number>();
@@ -70,7 +73,44 @@ export default function MultiplicationVideoLesson({
       }
     };
 
+    const generateVideo = async () => {
+      try {
+        setIsGeneratingVideo(true);
+        toast({
+          title: "Generating Animated Video 🎬",
+          description: "Creating your personalized lesson video...",
+        });
+
+        const { data, error } = await supabase.functions.invoke('generate-video', {
+          body: {
+            imageUrl: avatar.image_url,
+            prompt: topic.description,
+            topicTitle: topic.title
+          }
+        });
+
+        if (error) {
+          console.error('Video generation error:', error);
+          toast({
+            title: "Video in Progress",
+            description: "Using animated avatar for now.",
+          });
+        } else if (data.videoUrl) {
+          setVideoUrl(data.videoUrl);
+          toast({
+            title: "Video Ready! 🎥",
+            description: "Your animated lesson video is ready!",
+          });
+        }
+      } catch (error) {
+        console.error('Error generating video:', error);
+      } finally {
+        setIsGeneratingVideo(false);
+      }
+    };
+
     generateNarration();
+    generateVideo();
 
     return () => {
       if (utteranceRef.current) {
@@ -162,7 +202,7 @@ export default function MultiplicationVideoLesson({
       <main className="max-w-4xl mx-auto px-4 py-8">
         <Card className="overflow-hidden">
           {/* Video Display Area */}
-          <div className="relative bg-gradient-hero aspect-video flex items-center justify-center">
+          <div className="relative bg-gradient-hero aspect-video flex items-center justify-center overflow-hidden">
             {isGenerating ? (
               <div className="flex flex-col items-center gap-4">
                 <Loader2 className="w-12 h-12 animate-spin text-primary" />
@@ -171,41 +211,67 @@ export default function MultiplicationVideoLesson({
               </div>
             ) : (
               <>
-                {/* Animated Avatar */}
-                <div className="relative">
-                  <div className={`transition-all duration-300 ${isPlaying ? 'animate-float' : ''}`}>
-                    <img
-                      src={avatar.image_url}
-                      alt="Tutor Avatar"
-                      className={`w-64 h-64 object-contain transition-all duration-500 ${
-                        isPlaying ? 'scale-110' : 'scale-100'
-                      }`}
-                      style={{
-                        filter: isPlaying ? 'drop-shadow(0 10px 30px rgba(var(--primary), 0.3))' : 'none',
-                      }}
+                {/* Video or Animated Avatar */}
+                {videoUrl ? (
+                  <div className="relative w-full h-full">
+                    <video
+                      ref={videoRef}
+                      src={videoUrl}
+                      className="w-full h-full object-cover"
+                      loop
+                      muted={isMuted}
+                      playsInline
+                      autoPlay={isPlaying}
                     />
+                    {isGeneratingVideo && (
+                      <div className="absolute top-4 right-4 bg-background/80 backdrop-blur-sm px-3 py-2 rounded-full shadow-lg flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span className="text-xs font-medium">Generating video...</span>
+                      </div>
+                    )}
                   </div>
-                  {isPlaying && (
-                    <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 bg-card px-4 py-2 rounded-full shadow-lg animate-pulse">
-                      <p className="text-sm font-medium">🎙️ Teaching {topic.title}...</p>
+                ) : (
+                  <div className="relative">
+                    <div className={`transition-all duration-300 ${isPlaying ? 'animate-float' : ''}`}>
+                      <img
+                        src={avatar.image_url}
+                        alt="Tutor Avatar"
+                        className={`w-64 h-64 object-contain transition-all duration-500 ${
+                          isPlaying ? 'scale-110' : 'scale-100'
+                        }`}
+                        style={{
+                          filter: isPlaying ? 'drop-shadow(0 10px 30px rgba(var(--primary), 0.3))' : 'none',
+                        }}
+                      />
                     </div>
-                  )}
-                  {!isPlaying && progress > 0 && progress < 100 && (
-                    <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 bg-card px-4 py-2 rounded-full shadow-lg">
-                      <p className="text-sm font-medium">⏸️ Paused</p>
-                    </div>
-                  )}
-                  
-                  {/* Animated sparkles around avatar when playing */}
-                  {isPlaying && (
-                    <>
-                      <div className="absolute top-10 left-10 text-3xl animate-bounce" style={{ animationDelay: '0s' }}>✨</div>
-                      <div className="absolute top-20 right-10 text-2xl animate-bounce" style={{ animationDelay: '0.3s' }}>⭐</div>
-                      <div className="absolute bottom-20 left-5 text-2xl animate-bounce" style={{ animationDelay: '0.6s' }}>🌟</div>
-                      <div className="absolute bottom-10 right-5 text-3xl animate-bounce" style={{ animationDelay: '0.9s' }}>💫</div>
-                    </>
-                  )}
-                </div>
+                    {isGeneratingVideo && (
+                      <div className="absolute top-4 right-4 bg-background/80 backdrop-blur-sm px-3 py-2 rounded-full shadow-lg flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span className="text-xs font-medium">Generating video...</span>
+                      </div>
+                    )}
+                    {isPlaying && (
+                      <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 bg-card px-4 py-2 rounded-full shadow-lg animate-pulse">
+                        <p className="text-sm font-medium">🎙️ Teaching {topic.title}...</p>
+                      </div>
+                    )}
+                    {!isPlaying && progress > 0 && progress < 100 && (
+                      <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 bg-card px-4 py-2 rounded-full shadow-lg">
+                        <p className="text-sm font-medium">⏸️ Paused</p>
+                      </div>
+                    )}
+                    
+                    {/* Animated sparkles around avatar when playing */}
+                    {isPlaying && (
+                      <>
+                        <div className="absolute top-10 left-10 text-3xl animate-bounce" style={{ animationDelay: '0s' }}>✨</div>
+                        <div className="absolute top-20 right-10 text-2xl animate-bounce" style={{ animationDelay: '0.3s' }}>⭐</div>
+                        <div className="absolute bottom-20 left-5 text-2xl animate-bounce" style={{ animationDelay: '0.6s' }}>🌟</div>
+                        <div className="absolute bottom-10 right-5 text-3xl animate-bounce" style={{ animationDelay: '0.9s' }}>💫</div>
+                      </>
+                    )}
+                  </div>
+                )}
 
                 {/* Play/Pause Overlay */}
                 {!isPlaying && progress === 0 && !isGenerating && (
