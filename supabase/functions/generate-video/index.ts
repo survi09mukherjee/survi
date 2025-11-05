@@ -11,11 +11,11 @@ serve(async (req) => {
   }
 
   try {
-    const { imageUrl, prompt, topicTitle } = await req.json();
+    const { imageUrl, lessonScript, characterName } = await req.json();
     
-    if (!imageUrl || !prompt) {
+    if (!imageUrl || !lessonScript) {
       return new Response(
-        JSON.stringify({ error: "Image URL and prompt are required" }),
+        JSON.stringify({ error: "Image URL and lesson script are required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -25,22 +25,35 @@ serve(async (req) => {
       throw new Error("PIXVERSE_API_KEY is not configured");
     }
 
-    console.log("Starting video generation for:", topicTitle);
+    console.log("Starting lip-sync video generation for:", characterName);
 
-    // Step 1: Upload the image to Pixverse
-    const imageResponse = await fetch(imageUrl);
-    const imageBlob = await imageResponse.blob();
+    // Step 1: Convert base64 image to blob if needed
+    let imageBlob: Blob;
+    if (imageUrl.startsWith('data:image')) {
+      const base64Data = imageUrl.split(',')[1];
+      const binaryString = atob(base64Data);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      imageBlob = new Blob([bytes], { type: 'image/png' });
+      console.log("Converted base64 to blob");
+    } else {
+      const imageResponse = await fetch(imageUrl);
+      imageBlob = await imageResponse.blob();
+    }
     
+    // Step 2: Upload the image to Pixverse
     const uploadFormData = new FormData();
-    uploadFormData.append("image", imageBlob, "character.jpg");
+    uploadFormData.append("image", imageBlob, "character.png");
 
-    const traceId = crypto.randomUUID();
+    const uploadTraceId = crypto.randomUUID();
     
     const uploadResponse = await fetch("https://app-api.pixverse.ai/openapi/v2/image/upload", {
       method: "POST",
       headers: {
         "API-KEY": PIXVERSE_API_KEY,
-        "Ai-trace-id": traceId,
+        "Ai-trace-id": uploadTraceId,
       },
       body: uploadFormData,
     });
@@ -55,47 +68,45 @@ serve(async (req) => {
     const imgId = uploadData.data.img_id;
     console.log("Image uploaded successfully, img_id:", imgId);
 
-    // Step 2: Generate video from image
-    const videoTraceId = crypto.randomUUID();
-    const videoPrompt = `${prompt}. An animated character teaching math to children in a fun and engaging way. Smooth, gentle movements with a friendly expression.`;
-    
-    const videoResponse = await fetch("https://app-api.pixverse.ai/openapi/v2/video/img/generate", {
+    // Step 3: First generate a base video from the image
+    const baseVideoTraceId = crypto.randomUUID();
+    const baseVideoResponse = await fetch("https://app-api.pixverse.ai/openapi/v2/video/img/generate", {
       method: "POST",
       headers: {
         "API-KEY": PIXVERSE_API_KEY,
-        "Ai-trace-id": videoTraceId,
+        "Ai-trace-id": baseVideoTraceId,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         img_id: imgId,
-        prompt: videoPrompt,
+        prompt: "A friendly character portrait, slight natural breathing animation, neutral expression ready to speak",
         duration: 5,
         model: "v4.5",
         quality: "540p",
       }),
     });
 
-    if (!videoResponse.ok) {
-      const error = await videoResponse.text();
-      console.error("Video generation error:", error);
-      throw new Error("Failed to start video generation");
+    if (!baseVideoResponse.ok) {
+      const error = await baseVideoResponse.text();
+      console.error("Base video generation error:", error);
+      throw new Error("Failed to start base video generation");
     }
 
-    const videoData = await videoResponse.json();
-    const taskId = videoData.data.task_id;
-    console.log("Video generation started, task_id:", taskId);
+    const baseVideoData = await baseVideoResponse.json();
+    const baseTaskId = baseVideoData.data.task_id;
+    console.log("Base video generation started, task_id:", baseTaskId);
 
-    // Step 3: Poll for video completion
+    // Step 4: Poll for base video completion
+    let baseVideoId = null;
     let attempts = 0;
-    const maxAttempts = 60; // 5 minutes max
-    let videoUrl = null;
+    const maxAttempts = 60;
 
-    while (attempts < maxAttempts) {
-      await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+    while (attempts < maxAttempts && !baseVideoId) {
+      await new Promise(resolve => setTimeout(resolve, 5000));
       
       const statusTraceId = crypto.randomUUID();
       const statusResponse = await fetch(
-        `https://app-api.pixverse.ai/openapi/v2/video/status?task_id=${taskId}`,
+        `https://app-api.pixverse.ai/openapi/v2/video/status?task_id=${baseTaskId}`,
         {
           headers: {
             "API-KEY": PIXVERSE_API_KEY,
@@ -106,29 +117,103 @@ serve(async (req) => {
 
       if (statusResponse.ok) {
         const statusData = await statusResponse.json();
-        console.log("Video status:", statusData.data.status);
+        console.log("Base video status:", statusData.data.status);
+
+        if (statusData.data.status === "success") {
+          baseVideoId = statusData.data.video_id;
+          console.log("Base video generated successfully, video_id:", baseVideoId);
+          break;
+        } else if (statusData.data.status === "failed") {
+          throw new Error("Base video generation failed");
+        }
+      }
+      attempts++;
+    }
+
+    if (!baseVideoId) {
+      throw new Error("Base video generation timed out");
+    }
+
+    // Step 5: Get TTS speaker list to find a suitable voice
+    const ttsListTraceId = crypto.randomUUID();
+    const ttsListResponse = await fetch("https://app-api.pixverse.ai/openapi/v2/video/lip_sync/tts/list", {
+      headers: {
+        "API-KEY": PIXVERSE_API_KEY,
+        "Ai-trace-id": ttsListTraceId,
+      },
+    });
+
+    const ttsListData = await ttsListResponse.json();
+    const speakerId = ttsListData.data[0]?.id || "en-US-1"; // Use first available speaker
+    console.log("Using TTS speaker:", speakerId);
+
+    // Step 6: Generate lip-sync video with narration
+    const lipsyncTraceId = crypto.randomUUID();
+    const lipsyncResponse = await fetch("https://app-api.pixverse.ai/openapi/v2/video/lip_sync/generate", {
+      method: "POST",
+      headers: {
+        "API-KEY": PIXVERSE_API_KEY,
+        "Ai-trace-id": lipsyncTraceId,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        source_video_id: baseVideoId,
+        lip_sync_tts_speaker_id: speakerId,
+        lip_sync_tts_content: lessonScript,
+      }),
+    });
+
+    if (!lipsyncResponse.ok) {
+      const error = await lipsyncResponse.text();
+      console.error("Lip-sync generation error:", error);
+      throw new Error("Failed to start lip-sync generation");
+    }
+
+    const lipsyncData = await lipsyncResponse.json();
+    const lipsyncTaskId = lipsyncData.data.task_id;
+    console.log("Lip-sync generation started, task_id:", lipsyncTaskId);
+
+    // Step 7: Poll for lip-sync video completion
+    let videoUrl = null;
+    attempts = 0;
+
+    while (attempts < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      
+      const lipsyncStatusTraceId = crypto.randomUUID();
+      const lipsyncStatusResponse = await fetch(
+        `https://app-api.pixverse.ai/openapi/v2/video/status?task_id=${lipsyncTaskId}`,
+        {
+          headers: {
+            "API-KEY": PIXVERSE_API_KEY,
+            "Ai-trace-id": lipsyncStatusTraceId,
+          },
+        }
+      );
+
+      if (lipsyncStatusResponse.ok) {
+        const statusData = await lipsyncStatusResponse.json();
+        console.log("Lip-sync video status:", statusData.data.status);
 
         if (statusData.data.status === "success") {
           videoUrl = statusData.data.video_url;
-          console.log("Video generated successfully:", videoUrl);
+          console.log("Lip-sync video generated successfully:", videoUrl);
           break;
         } else if (statusData.data.status === "failed") {
-          throw new Error("Video generation failed");
+          throw new Error("Lip-sync video generation failed");
         }
       }
-
       attempts++;
     }
 
     if (!videoUrl) {
-      throw new Error("Video generation timed out");
+      throw new Error("Lip-sync video generation timed out");
     }
 
     return new Response(
       JSON.stringify({ 
         videoUrl,
-        taskId,
-        message: "Video generated successfully"
+        message: "Lip-sync video generated successfully with character narration"
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

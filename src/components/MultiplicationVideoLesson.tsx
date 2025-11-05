@@ -35,7 +35,7 @@ export default function MultiplicationVideoLesson({
 
   // Generate narration on component mount
   useEffect(() => {
-    const generateNarration = async () => {
+    const generateNarration = async (): Promise<string | null> => {
       try {
         setIsGenerating(true);
         const { data, error } = await supabase.functions.invoke('generate-lesson-narration', {
@@ -59,7 +59,10 @@ export default function MultiplicationVideoLesson({
             title: "Lesson Ready! 🎓",
             description: `${avatar.character_name} is ready to teach!`,
           });
+          
+          return data.script;
         }
+        return null;
       } catch (error) {
         console.error('Error generating narration:', error);
         toast({
@@ -68,38 +71,39 @@ export default function MultiplicationVideoLesson({
           variant: "destructive",
         });
         setDuration(180);
+        return null;
       } finally {
         setIsGenerating(false);
       }
     };
 
-    const generateVideo = async () => {
+    const generateVideo = async (script: string) => {
       try {
         setIsGeneratingVideo(true);
         toast({
-          title: "Generating Animated Video 🎬",
-          description: "Creating your personalized lesson video...",
+          title: "Generating Lip-Sync Video 🎬",
+          description: "Creating video with synchronized character speech...",
         });
 
         const { data, error } = await supabase.functions.invoke('generate-video', {
           body: {
             imageUrl: avatar.image_url,
-            prompt: topic.description,
-            topicTitle: topic.title
+            lessonScript: script,
+            characterName: avatar.character_name
           }
         });
 
         if (error) {
           console.error('Video generation error:', error);
           toast({
-            title: "Video in Progress",
-            description: "Using animated avatar for now.",
+            title: "Video Generation in Progress",
+            description: "This may take a few minutes. Using animated avatar for now.",
           });
         } else if (data.videoUrl) {
           setVideoUrl(data.videoUrl);
           toast({
-            title: "Video Ready! 🎥",
-            description: "Your animated lesson video is ready!",
+            title: "Lip-Sync Video Ready! 🎥",
+            description: "Your character is now speaking with lip-sync!",
           });
         }
       } catch (error) {
@@ -109,8 +113,11 @@ export default function MultiplicationVideoLesson({
       }
     };
 
-    generateNarration();
-    generateVideo();
+    generateNarration().then((scriptText) => {
+      if (scriptText) {
+        generateVideo(scriptText);
+      }
+    });
 
     return () => {
       if (utteranceRef.current) {
