@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
-import { Mic, Loader2 } from 'lucide-react';
+import { Mic, Loader2, Upload } from 'lucide-react';
+import AnimateCharacterTeaching from '@/components/AnimateCharacterTeaching';
 
 interface MultiplicationAvatarSelectProps {
   onComplete: (avatar: any) => void;
@@ -20,6 +21,8 @@ export default function MultiplicationAvatarSelect({ onComplete }: Multiplicatio
   const [characterName, setCharacterName] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [generatedAvatar, setGeneratedAvatar] = useState<any>(null);
+  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
 
   const handleVoiceInput = () => {
     if (!('webkitSpeechRecognition' in window)) {
@@ -40,6 +43,43 @@ export default function MultiplicationAvatarSelect({ onComplete }: Multiplicatio
       setCharacterName(transcript);
     };
     recognition.start();
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: "Error",
+        description: "Please upload an image file",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const imageUrl = event.target?.result as string;
+      setUploadedImage(imageUrl);
+      setCharacterName(file.name.split('.')[0] || 'My Character');
+      
+      const avatarData = {
+        character_name: file.name.split('.')[0] || 'My Character',
+        character_type: 'uploaded',
+        tone: 'motivational',
+        image_url: imageUrl,
+        is_active: true
+      };
+      
+      setGeneratedAvatar(avatarData);
+      
+      toast({
+        title: "Success! 🎉",
+        description: "Avatar uploaded successfully!"
+      });
+    };
+    reader.readAsDataURL(file);
   };
 
   const generateWithCharacter = async (charName: string) => {
@@ -69,25 +109,7 @@ export default function MultiplicationAvatarSelect({ onComplete }: Multiplicatio
         is_active: true
       };
 
-      // Save avatar to database only if authenticated
-      if (user) {
-        const { data: savedAvatar, error: avatarError } = await supabase
-          .from('user_avatars')
-          .insert({
-            user_id: user.id,
-            ...avatarData
-          })
-          .select()
-          .single();
-
-        if (!avatarError && savedAvatar) {
-          onComplete(savedAvatar);
-        } else {
-          onComplete(avatarData);
-        }
-      } else {
-        onComplete(avatarData);
-      }
+      setGeneratedAvatar(avatarData);
 
       toast({
         title: "Success! 🎉",
@@ -123,6 +145,64 @@ export default function MultiplicationAvatarSelect({ onComplete }: Multiplicatio
     await generateWithCharacter(randomChar);
   };
 
+  const handleCompleteWithAvatar = async () => {
+    if (!generatedAvatar) return;
+    
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (user) {
+      const { data: savedAvatar, error: avatarError } = await supabase
+        .from('user_avatars')
+        .insert({
+          user_id: user.id,
+          ...generatedAvatar
+        })
+        .select()
+        .single();
+
+      if (!avatarError && savedAvatar) {
+        onComplete(savedAvatar);
+      } else {
+        onComplete(generatedAvatar);
+      }
+    } else {
+      onComplete(generatedAvatar);
+    }
+  };
+
+  // Show animation component if avatar is generated
+  if (generatedAvatar) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-secondary/10 p-4">
+        <div className="max-w-4xl mx-auto space-y-6">
+          {/* Avatar Preview */}
+          <Card className="p-6">
+            <div className="text-center space-y-4">
+              <h2 className="text-2xl font-bold">Your Learning Avatar</h2>
+              <div className="relative w-64 h-64 mx-auto rounded-lg overflow-hidden border-4 border-primary/20">
+                <img 
+                  src={generatedAvatar.image_url} 
+                  alt={generatedAvatar.character_name}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <p className="text-lg font-semibold">{generatedAvatar.character_name}</p>
+              <Button onClick={handleCompleteWithAvatar} size="lg" className="w-full max-w-md">
+                Continue to Lessons
+              </Button>
+            </div>
+          </Card>
+
+          {/* Animate Character Teaching Section */}
+          <AnimateCharacterTeaching 
+            characterImage={generatedAvatar.image_url}
+            characterName={generatedAvatar.character_name}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-secondary/10 flex items-center justify-center p-4">
       <Card className="max-w-2xl w-full p-8">
@@ -131,6 +211,36 @@ export default function MultiplicationAvatarSelect({ onComplete }: Multiplicatio
           <p className="text-muted-foreground">
             Choose your favorite character to be your multiplication tutor!
           </p>
+        </div>
+
+        {/* Upload Avatar Option */}
+        <div className="mb-8">
+          <label htmlFor="avatar-upload">
+            <div className="border-2 border-dashed border-primary/30 rounded-lg p-8 text-center cursor-pointer hover:border-primary/60 hover:bg-primary/5 transition-all">
+              <Upload className="w-12 h-12 mx-auto mb-3 text-primary" />
+              <p className="text-lg font-semibold mb-1">Upload Your Avatar</p>
+              <p className="text-sm text-muted-foreground">
+                Click to upload an image (PNG, JPG, JPEG)
+              </p>
+            </div>
+            <input
+              id="avatar-upload"
+              type="file"
+              accept="image/*"
+              onChange={handleImageUpload}
+              className="hidden"
+              disabled={isGenerating}
+            />
+          </label>
+        </div>
+
+        <div className="relative mb-8">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-muted-foreground/20"></div>
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-background px-2 text-muted-foreground">Or generate AI avatar</span>
+          </div>
         </div>
 
         {/* Character Input */}
