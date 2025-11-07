@@ -23,6 +23,7 @@ import {
 import { Wand2, Sparkles, Volume2, Mic, Upload, RotateCw, ArrowLeft } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import AnimateCharacterTeaching from '@/components/AnimateCharacterTeaching';
 
 type Step = 'input' | 'processing' | 'preview' | 'upload' | 'confirm';
 type ProcessingStage = 'searching' | 'removing' | 'rendering' | 'complete';
@@ -419,6 +420,12 @@ export default function CharacterGenerator() {
               >
                 Use as My Tutor
               </Button>
+
+              {/* Animate Character to Teach Section */}
+              <AnimateCharacterTeaching
+                characterImage={generatedCharacter}
+                characterName={characterName}
+              />
             </div>
           </Card>
         )}
