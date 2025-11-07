@@ -20,6 +20,14 @@ serve(async (req) => {
       );
     }
 
+    // Clean the script - remove special characters
+    const cleanScript = lessonScript
+      .replace(/\*/g, '')
+      .replace(/#{1,6}\s/g, '')
+      .replace(/\[|\]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
     const PIXVERSE_API_KEY = Deno.env.get("PIXVERSE_API_KEY");
     if (!PIXVERSE_API_KEY) {
       throw new Error("PIXVERSE_API_KEY is not configured");
@@ -134,7 +142,7 @@ serve(async (req) => {
       throw new Error("Base video generation timed out");
     }
 
-    // Step 5: Get TTS speaker list to find a suitable voice
+    // Step 5: Get TTS speaker list to find Indian English voice
     const ttsListTraceId = crypto.randomUUID();
     const ttsListResponse = await fetch("https://app-api.pixverse.ai/openapi/v2/video/lip_sync/tts/list", {
       headers: {
@@ -144,7 +152,17 @@ serve(async (req) => {
     });
 
     const ttsListData = await ttsListResponse.json();
-    const speakerId = ttsListData.data[0]?.id || "en-US-1"; // Use first available speaker
+    // Try to find Indian English voice, fallback to first English voice
+    let speakerId = ttsListData.data?.find((voice: any) => 
+      voice.id?.toLowerCase().includes('en-in') || 
+      voice.name?.toLowerCase().includes('indian')
+    )?.id;
+    
+    if (!speakerId) {
+      speakerId = ttsListData.data?.find((voice: any) => 
+        voice.id?.toLowerCase().includes('en')
+      )?.id || ttsListData.data[0]?.id || "en-US-1";
+    }
     console.log("Using TTS speaker:", speakerId);
 
     // Step 6: Generate lip-sync video with narration
@@ -159,7 +177,7 @@ serve(async (req) => {
       body: JSON.stringify({
         source_video_id: baseVideoId,
         lip_sync_tts_speaker_id: speakerId,
-        lip_sync_tts_content: lessonScript,
+        lip_sync_tts_content: cleanScript,
       }),
     });
 

@@ -198,6 +198,29 @@ export default function CharacterGenerator() {
         {step === 'input' && (
           <Card className="p-8">
             <div className="space-y-6">
+              {/* Upload Avatar Option */}
+              <div className="border-2 border-dashed border-primary/30 rounded-lg p-6 text-center space-y-3 bg-primary/5 hover:bg-primary/10 transition-colors cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                <Upload className="w-8 h-8 mx-auto text-primary" />
+                <div>
+                  <h3 className="font-semibold text-lg">Upload Your Avatar</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Have an image? Upload it directly to animate
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}>
+                  Choose Image
+                </Button>
+              </div>
+
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">Or generate one</span>
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="characterName" className="text-lg">Type character name</Label>
                 <div className="flex gap-2">

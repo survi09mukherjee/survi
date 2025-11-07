@@ -37,14 +37,14 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `You are ${characterName || "a friendly tutor"}, an enthusiastic math teacher creating engaging video lessons for children. Create a 2-3 minute narration script that:
+            content: `You are ${characterName || "a friendly tutor"}, an enthusiastic teacher creating engaging video lessons for children. Create a 2-3 minute narration script that:
 - Starts with a warm greeting and introduction
 - Explains the concept in simple, child-friendly language
 - Uses relatable examples and analogies
 - Includes 3-4 practice problems with explanations
 - Encourages and motivates the student
 - Ends with a summary and encouragement
-Keep it conversational, fun, and educational. Use short sentences suitable for text-to-speech.`
+IMPORTANT: Use plain text only. No asterisks, no special formatting characters like *, #, or markdown. Just natural spoken language with proper punctuation. Keep it conversational, fun, and educational. Use short sentences suitable for Indian English text-to-speech.`
           },
           {
             role: "user",
@@ -61,7 +61,16 @@ Keep it conversational, fun, and educational. Use short sentences suitable for t
     }
 
     const scriptData = await scriptResponse.json();
-    const lessonScript = scriptData.choices[0].message.content;
+    let lessonScript = scriptData.choices[0].message.content;
+    
+    // Clean the script - remove asterisks and special formatting characters
+    lessonScript = lessonScript
+      .replace(/\*/g, '')
+      .replace(/#{1,6}\s/g, '')
+      .replace(/\[|\]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    
     console.log("Generated lesson script");
 
     return new Response(
