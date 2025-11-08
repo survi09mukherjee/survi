@@ -4,6 +4,7 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, Video, Sparkles, CheckCircle2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -19,6 +20,7 @@ export default function AnimateCharacterTeaching({
 }: AnimateCharacterTeachingProps) {
   const [topic, setTopic] = useState('');
   const [lessonScript, setLessonScript] = useState('');
+  const [voiceAccent, setVoiceAccent] = useState('en-IN');
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
   const [videoUrl, setVideoUrl] = useState('');
@@ -88,7 +90,8 @@ export default function AnimateCharacterTeaching({
         body: {
           imageUrl: characterImage,
           lessonScript: lessonScript,
-          characterName: characterName
+          characterName: characterName,
+          voiceAccent: voiceAccent
         }
       });
 
@@ -171,6 +174,27 @@ export default function AnimateCharacterTeaching({
             </Button>
           </div>
         </div>
+
+        {/* Voice Accent Selection */}
+        {lessonScript && (
+          <div className="space-y-2">
+            <Label htmlFor="accent">Voice Accent</Label>
+            <Select value={voiceAccent} onValueChange={setVoiceAccent} disabled={isGeneratingVideo}>
+              <SelectTrigger id="accent">
+                <SelectValue placeholder="Select voice accent" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="en-IN">Indian English</SelectItem>
+                <SelectItem value="en-US">American English</SelectItem>
+                <SelectItem value="en-GB">British English</SelectItem>
+                <SelectItem value="en-AU">Australian English</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Select the voice accent for your animated character
+            </p>
+          </div>
+        )}
 
         {/* Script Display/Edit */}
         {lessonScript && (
@@ -259,7 +283,7 @@ export default function AnimateCharacterTeaching({
             {isVideoReady && (
               <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 text-center animate-in fade-in slide-in-from-bottom-2 duration-500">
                 <p className="text-sm text-green-700 dark:text-green-400 font-medium">
-                  ✅ Character animated with Indian English voice, lip-sync, expressions, and movements
+                  ✅ Character animated with {voiceAccent === 'en-IN' ? 'Indian English' : voiceAccent === 'en-US' ? 'American English' : voiceAccent === 'en-GB' ? 'British English' : 'Australian English'} voice, lip-sync, expressions, and movements
                 </p>
               </div>
             )}
@@ -275,7 +299,7 @@ export default function AnimateCharacterTeaching({
             <ul className="list-disc list-inside space-y-1 ml-2">
               <li>Full character animation with mouth movements (lip-sync)</li>
               <li>Natural expressions and slight body movements</li>
-              <li>Indian English AI voice matching your character</li>
+              <li>AI voice in your selected accent</li>
               <li>Professional teaching video ready to watch</li>
             </ul>
             <p className="mt-3 text-xs">
