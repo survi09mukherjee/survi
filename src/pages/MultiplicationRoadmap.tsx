@@ -7,7 +7,6 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/components/ui/use-toast';
 import { Lock, Play, CheckCircle, Award, ArrowLeft } from 'lucide-react';
-import MultiplicationAvatarSelect from '@/components/MultiplicationAvatarSelect';
 import MultiplicationVideoLesson from '@/components/MultiplicationVideoLesson';
 import MultiplicationQuiz from '@/components/MultiplicationQuiz';
 import MultiplicationDoubtClearance from '@/components/MultiplicationDoubtClearance';
@@ -34,7 +33,7 @@ interface UserProgress {
 export default function MultiplicationRoadmap() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [step, setStep] = useState<'avatar' | 'roadmap' | 'video' | 'quiz' | 'doubt'>('avatar');
+  const [step, setStep] = useState<'roadmap' | 'video' | 'quiz' | 'doubt'>('roadmap');
   const [topics, setTopics] = useState<Topic[]>([]);
   const [userProgress, setUserProgress] = useState<Record<string, UserProgress>>({});
   const [selectedAvatar, setSelectedAvatar] = useState<any>(null);
@@ -119,7 +118,7 @@ export default function MultiplicationRoadmap() {
       }, 0) || 0;
       setTotalXP(xp);
 
-      // Check if user has avatar (only if authenticated)
+      // Check if user has avatar - redirect to character generator if not
       if (user) {
         const { data: avatarData } = await supabase
           .from('user_avatars')
@@ -130,8 +129,23 @@ export default function MultiplicationRoadmap() {
 
         if (avatarData) {
           setSelectedAvatar(avatarData);
-          setStep('roadmap');
+        } else {
+          // No avatar found, redirect to character generator
+          toast({
+            title: "Create Your Avatar First",
+            description: "Let's create your learning avatar to start multiplication lessons",
+          });
+          navigate('/character-generator');
+          return;
         }
+      } else {
+        // Not authenticated, redirect to character generator
+        toast({
+          title: "Create Your Avatar",
+          description: "Let's create your learning avatar to continue",
+        });
+        navigate('/character-generator');
+        return;
       }
 
       setLoading(false);
@@ -144,11 +158,6 @@ export default function MultiplicationRoadmap() {
       });
       setLoading(false);
     }
-  };
-
-  const handleAvatarComplete = (avatar: any) => {
-    setSelectedAvatar(avatar);
-    setStep('roadmap');
   };
 
   const handleTopicClick = (topic: Topic) => {
@@ -257,10 +266,6 @@ export default function MultiplicationRoadmap() {
         </div>
       </div>
     );
-  }
-
-  if (step === 'avatar') {
-    return <MultiplicationAvatarSelect onComplete={handleAvatarComplete} />;
   }
 
   if (step === 'video' && currentTopic) {

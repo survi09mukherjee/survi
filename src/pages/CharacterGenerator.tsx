@@ -176,9 +176,47 @@ export default function CharacterGenerator() {
     setIsGenerating(false);
   };
 
-  const handleUseTutor = () => {
-    toast.success('Tutor assigned to your profile!');
-    setTimeout(() => navigate('/dashboard'), 1500);
+  const handleUseTutor = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        toast.error('Please sign in to save your avatar');
+        return;
+      }
+
+      // Deactivate any existing avatars
+      await supabase
+        .from('user_avatars')
+        .update({ is_active: false })
+        .eq('user_id', user.id);
+
+      // Save new avatar to database
+      const { data: savedAvatar, error } = await supabase
+        .from('user_avatars')
+        .insert({
+          user_id: user.id,
+          character_name: characterName,
+          character_type: characterType,
+          tone: tone,
+          image_url: generatedCharacter || uploadedImage,
+          is_active: true
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error saving avatar:', error);
+        toast.error('Failed to save avatar. Please try again.');
+        return;
+      }
+
+      toast.success('Avatar saved! Starting multiplication lessons...');
+      setTimeout(() => navigate('/multiplication'), 1000);
+    } catch (error) {
+      console.error('Error in handleUseTutor:', error);
+      toast.error('An error occurred. Please try again.');
+    }
   };
 
   return (
