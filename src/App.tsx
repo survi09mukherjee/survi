@@ -17,6 +17,7 @@ import LessonLibrary from "./pages/LessonLibrary";
 import LanguageHub from "./pages/LanguageHub";
 import MultiplicationRoadmap from "./pages/MultiplicationRoadmap";
 import NotFound from "./pages/NotFound";
+import { DoraGuideOverlay } from "./features/doraGuide/DoraGuideOverlay";
 
 const queryClient = new QueryClient();
 
@@ -43,6 +44,7 @@ const App = () => (
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
+        <DoraGuideOverlay />
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
