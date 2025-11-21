@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { imageUrl, lessonScript, characterName } = await req.json();
+    const { imageUrl, lessonScript, characterName, voiceAccent = 'en-IN' } = await req.json();
     
     if (!imageUrl || !lessonScript) {
       return new Response(
@@ -142,7 +142,7 @@ serve(async (req) => {
       throw new Error("Base video generation timed out");
     }
 
-    // Step 5: Get TTS speaker list to find Indian English voice
+    // Step 5: Get TTS speaker list and select voice based on accent preference
     const ttsListTraceId = crypto.randomUUID();
     const ttsListResponse = await fetch("https://app-api.pixverse.ai/openapi/v2/video/lip_sync/tts/list", {
       headers: {
@@ -152,18 +152,39 @@ serve(async (req) => {
     });
 
     const ttsListData = await ttsListResponse.json();
-    // Try to find Indian English voice, fallback to first English voice
-    let speakerId = ttsListData.data?.find((voice: any) => 
-      voice.id?.toLowerCase().includes('en-in') || 
-      voice.name?.toLowerCase().includes('indian')
-    )?.id;
+    console.log("Available TTS voices:", JSON.stringify(ttsListData.data, null, 2));
     
+    // Select voice based on accent preference
+    let speakerId;
+    
+    if (voiceAccent === 'en-IN') {
+      speakerId = ttsListData.data?.find((voice: any) => 
+        voice.id?.toLowerCase().includes('en-in') || 
+        voice.name?.toLowerCase().includes('indian')
+      )?.id;
+    } else if (voiceAccent === 'en-US') {
+      speakerId = ttsListData.data?.find((voice: any) => 
+        voice.id?.toLowerCase().includes('en-us')
+      )?.id;
+    } else if (voiceAccent === 'en-GB') {
+      speakerId = ttsListData.data?.find((voice: any) => 
+        voice.id?.toLowerCase().includes('en-gb') ||
+        voice.name?.toLowerCase().includes('british')
+      )?.id;
+    } else if (voiceAccent === 'en-AU') {
+      speakerId = ttsListData.data?.find((voice: any) => 
+        voice.id?.toLowerCase().includes('en-au') ||
+        voice.name?.toLowerCase().includes('australian')
+      )?.id;
+    }
+    
+    // Fallback to any English voice if preferred accent not found
     if (!speakerId) {
       speakerId = ttsListData.data?.find((voice: any) => 
         voice.id?.toLowerCase().includes('en')
       )?.id || ttsListData.data[0]?.id || "en-US-1";
     }
-    console.log("Using TTS speaker:", speakerId);
+    console.log("Using TTS speaker:", speakerId, "for accent:", voiceAccent);
 
     // Step 6: Generate lip-sync video with narration
     const lipsyncTraceId = crypto.randomUUID();
